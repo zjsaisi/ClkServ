@@ -1,0 +1,106 @@
+#*****************************************************************************
+#                                                                            *
+#   Copyright (C) 2009 Symmetricom, Inc., all rights reserved                *
+#                                                                            *
+#   This software contains proprietary and confidential information of       *
+#   Symmetricom.                                                             *
+#   It may not be reproduced, used, or disclosed to others for any purpose   *
+#   without the written authorization of Symmetricom.                        *
+#                                                                            *
+#*****************************************************************************
+#
+# FILE NAME    : Makefile
+#
+# AUTHOR       : Jining Yang
+#
+# DESCRIPTION  : 
+# Makefile for building PTP and PTP/GPS clients using MPC8313 timestamper.
+# This makefile uses static linked libraries libsymm_sc_mpc8313.a and 
+# libsymm_sc_gps_mpc8313.a.
+#
+# Revision control header:
+# $Id: Makefile.servo 1.1 2011/03/01 18:32:48PST Daniel Brown (dbrown) Exp  $
+#
+#******************************************************************************
+
+ifndef scriptDir
+$(error scriptDir must be defined, perhaps use setupenv script?)
+endif
+
+TARGET = $(prodName)
+LIB_NAME = libsymm_mpc8313_$(prodName).a
+
+all: $(TARGET)
+
+EXE_NAME = sc
+
+include $(scriptDir)/make.top.include
+
+CC = $(toolChainPrefix)-gcc
+LD = $(toolChainPrefix)-ld
+CC_FLAGS = -Wall -O0 -pthread -ggdb -I. -I../common -I../common/include
+CC_FLAGS_GPS = -Wall -O0 -pthread -ggdb -I. -I../common -I../common/include -D GPS_BUILD=1
+LD_FLAGS = ../common/lib/$(LIB_NAME) \
+           -lpthread -lrt -lm -Wl,-Map,$(EXE_NAME).map
+
+SOURCES := \
+	./natsemi_util/epl_1588.c \
+	./timestamper_if/sc_timestamp.c \
+	./clock_if/sc_clock_if.c \
+	../common/network_if/sc_network_if.c \
+	../common/log/sc_log.c \
+	../common/user_if/sc_ui.c \
+	../common/config_if/sc_readconfig.c \
+	../common/chan_processing_if/sc_SSM_handling.c \
+	../common/main.c
+
+SE_SOURCES = \
+	../common/se_if/sc_se_if.c
+
+E1_SOURCES = \
+	../common/e1_if/sc_e1_if.c
+
+T1_SOURCES = \
+	../common/t1_if/sc_t1_if.c
+
+GPS_SOURCES = \
+	../common/gps_if/sc_gps_if.c
+
+OBJECTS := $(SOURCES:.c=.o)
+SHARED_OBJECTS_GPS := $(SOURCES:.c=_gps.o)
+SE_OBJECTS := $(SE_SOURCES:.c=.o)
+E1_OBJECTS := $(E1_SOURCES:.c=.o)
+T1_OBJECTS := $(T1_SOURCES:.c=.o)
+GPS_OBJECTS := $(GPS_SOURCES:.c=.o)
+
+%.o : %.c  $(HEADERS)
+	$(CC) -c $(CC_FLAGS) -o $@ $<
+	@echo
+
+%_gps.o : %.c  $(HEADERS)
+	$(CC) -c $(CC_FLAGS_GPS) -o $@ $<
+	@echo
+
+default: $(TARGET)
+
+Bcom: $(SHARED_OBJECTS_GPS) $(SE_OBJECTS) $(E1_OBJECTS) $(T1_OBJECTS) $(GPS_OBJECTS) ../common/lib/$(LIB_NAME) Makefile
+	$(CC) $(SHARED_OBJECTS_GPS) $(SE_OBJECTS) $(E1_OBJECTS) $(T1_OBJECTS) $(GPS_OBJECTS) $(LD_FLAGS) -o $(EXE_NAME) 
+	@echo
+
+Servo: $(SHARED_OBJECTS_GPS) $(SE_OBJECTS) $(E1_OBJECTS) $(T1_OBJECTS) $(GPS_OBJECTS) ../common/lib/$(LIB_NAME) Makefile
+	$(CC) $(SHARED_OBJECTS_GPS) $(SE_OBJECTS) $(E1_OBJECTS) $(T1_OBJECTS) $(GPS_OBJECTS) $(LD_FLAGS) -o $(EXE_NAME) 
+	@echo
+
+clean:
+	rm -f $(OBJECTS)
+	rm -f $(SHARED_OBJECTS_GPS)
+	rm -f $(SE_OBJECTS)
+	rm -f $(E1_OBJECTS)
+	rm -f $(T1_OBJECTS)
+	rm -f $(GPS_OBJECTS)
+	rm -f $(EXE_NAME)
+	rm -f $(EXE_NAME).map
+
+.SUFFIXES: .c .o .co
+
+.PHONY: clean

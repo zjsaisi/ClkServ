@@ -1,0 +1,1066 @@
+/*****************************************************************************
+*                                                                            *
+*   Copyright (C) 2009 Symmetricom, Inc., all rights reserved                *
+*                                                                            *
+*   This software contains proprietary and confidential information of       *
+*   Symmetricom.                                                             *
+*   It may not be reproduced, used, or disclosed to others for any purpose   *
+*   without the written authorization of Symmetricom.                        *
+*                                                                            *
+******************************************************************************
+
+FILE NAME    : sc_servo_api.h
+
+AUTHOR       : Jining Yang
+
+DESCRIPTION  : 
+
+This header file contains the API definitions for SCi servo.
+
+Revision control header:
+$Id: sc_servo_api.h 1.23 2011/10/11 14:16:27PDT German Alvarez (galvarez) Exp  $
+
+******************************************************************************
+*/
+
+/* Prevent file from being included multiple times. */
+#ifndef H_SC_SERVO_API_h
+#define H_SC_SERVO_API_h
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
+/*****************************************************************************/
+/*                       ***INCLUDES Definitions***                          */
+/*  Nested includes should not be used as a general practice.  If there is a */
+/*  good reason to include an include within an include, do so here. 	     */
+/*****************************************************************************/
+#include "sc_types.h"
+
+/*****************************************************************************/
+/*                       ***CONSTANT Definitions***                          */
+/*  This section should be used to define constants (#defines) and macros    */
+/*  that can be used by any module that includes this file.                  */
+/*****************************************************************************/
+/* Default servo values */
+#define k_DEFAULT_SERVO_LO_TYPE           (e_OCXO)
+#define k_DEFAULT_SERVO_LO_QL             (0x0F)
+#define k_DEFAULT_SERVO_TRANSPORT         (e_PTP_MODE_ETHERNET)
+#define k_DEFAULT_SERVO_PHASE_MODE        (k_PTP_PHASE_MODE_STANDARD | k_PTP_PHASE_MODE_INBAND)
+#define k_DEFAULT_SERVO_FREQ_CORR         (0.0)
+#define k_DEFAULT_SERVO_FREQ_CORR_TIME    {0,0}
+#define k_DEFAULT_SERVO_FACT_CORR         (0.0)
+#define k_DEFAULT_SERVO_FACT_CORR_TIME    {0,0}
+#define k_DEFAULT_SERVO_BRIDGE            (0)
+
+/* default values for IPDV */
+#define k_IPDV_DEFAULT_THRES  (50) /* 50 ns    */
+#define k_IPDV_DEFAULT_PACING (16) 
+#define k_IPDV_DEFAULT_INTV   (1)  /* 1 minute */
+
+/** Bit map for dw_ptpPhaseMode  **/
+#define k_PTP_PHASE_MODE_STANDARD  0x1  /* if bit 0 is 1, then standard mode. */
+                                        /* Phase is decoupled from frequency. */
+                                        /* if bit 0 is 0, then coupled mode.  */
+                                        /* Phase is coupled to frequency      */
+#define k_PTP_PHASE_MODE_INBAND    0x2  /* if bit 1 is 1, then in-band phase  */
+                                        /* adjust. Phase correction will move */
+                                        /* timestamper.                       */
+                                        /* if bit 1 is 0, then out-band phase */
+                                        /* adjust. Phase correction will not  */
+                                        /* move timestamper.                  */
+
+/*****************************************************************************/
+/*                       ***Data Type Specifications***                      */
+/*  This section should be used to specify data types including structures,  */
+/*  enumerations, unions, and redefining individual data types.              */
+/*****************************************************************************/
+
+/* Enumerations */
+typedef enum
+{
+  e_PARAM_GET   = (0),   /* Get the parameter */
+  e_PARAM_SET   = (1),   /* Set the parameter */
+  e_PARAM_CMD   = (2),   /* Send Command      */
+} t_paramOperEnum;
+
+typedef enum
+{
+  e_FLL_STATE_ACQUIRING = (0),   /* FLL Acquiring lock */
+  e_FLL_STATE_WARMUP    = (1),   /* FLL warmup state   */
+  e_FLL_STATE_FAST      = (2),   /* FLL fast loop      */
+  e_FLL_STATE_NORMAL    = (3),   /* FLL normal loop    */
+  e_FLL_STATE_BRIDGE    = (4),   /* FLL bridge state   */
+  e_FLL_STATE_HOLDOVER  = (5)    /* FLL Holdover state */
+} t_fllStateEnum;
+
+/* the lower the number the better the source */
+typedef enum
+{
+  e_RB        = (0),   /* Rubidium Oscillator */
+  e_DOCXO     = (1),   /* Double oven OCXO    */
+  e_OCXO      = (2),   /* OCXO                */
+  e_MINI_OCXO = (3),   /* Mini- OCXO          */
+  e_TCXO      = (4),   /* TCXO                */
+  e_OCXO_EXTENED_TEMP = (5), /* OCXO with extended temperature range */
+} t_loTypeEnum;
+
+typedef enum
+{
+  e_PTP_MODE_ETHERNET   = (0),   /* PTP Ethernet mode  */
+  e_PTP_MODE_DSL        = (1),   /* PTP DSL mode       */
+  e_PTP_MODE_MICROWAVE  = (2),   /* PTP microwave mode */
+  e_PTP_MODE_SONET      = (3),    /* PTP SONET mode     */
+  e_PTP_MODE_SLOW_ETHERNET=(4)   /* PTP on Slow ethernet  */
+} t_ptpAccessTransportEnum;
+
+/*
+------------------------------------------------------------------------
+The severity code enumeration reflects the severity of an occurred
+error condition. (IEEE standard chapter 15.5.3.1.7) 
+------------------------------------------------------------------------
+*/
+typedef enum
+{
+  e_EVENT_EMRG = 0x00, /* Emergency: system is unusable */
+  e_EVENT_ALRT = 0x01, /* Alert: immediate action needed */
+  e_EVENT_CRIT = 0x02, /* Critical: critical conditions */
+  e_EVENT_ERR  = 0x03, /* Error: error conditions */
+  e_EVENT_WARN = 0x04, /* Warning: warning conditions */
+  e_EVENT_NOTC = 0x05, /* Notice: normal but significant condition */
+  e_EVENT_INFO = 0x06, /* Informational: informational messages */
+  e_EVENT_DBG  = 0x07  /* Debug: debug-level messages */
+  /* 0x08-0xFF Reserved */
+} t_eventSevEnum;
+
+typedef enum
+{
+  e_EVENT_CLEAR     = 0,
+  e_EVENT_SET       = 1,
+  e_EVENT_TRANSIENT = 2 
+} t_eventStateEnum;
+
+typedef enum
+{
+  e_SC_TST_NORMAL             = (0), /* Normal operating mode                 */
+  e_SC_TST_FREQ_64PPB_STEP    = (1), /* Steps frequency from -512pbb to +512  */
+                                     /* ppb in 16 steps for 30seconds each    */
+  e_SC_TST_PHASE_100US_STEP   = (2), /* Steps phase in a +10usec and -10usecs,*/
+                                     /* 0usec pattern                         */ 
+  e_SC_TST_VAR_CAL            = (3), /* Run Varactor Calibration test         */
+  e_SC_TST_FIFO_BUF_FWD       = (4), /* Prints 4k forward timestamp FIFO then */
+                                     /* reverts back to previous mode         */
+  e_SC_TST_FIFO_BUF_REV       = (5), /* Prints 4k reversion timestamp FIFO    */
+                                     /* then reverts back to previous mode    */
+  e_SC_TST_FIFO_BUF_FWD_SHORT = (6), /* Prints short list from 4k forward     */
+                                     /* timestamp FIFO then goes back to      */
+                                     /* previous mode                         */
+  e_SC_TST_FIFO_BUF_REV_SHORT = (7),  /* Prints short list from 4k reversion   */
+                                     /* timestamp FIFO then reverts back to   */
+                                     /* previous mode                         */
+  e_SC_TST_TIMESTAMP_THRESHOLD = (8),  /* Set timestamp threshold to catch ts mismatch   */
+  e_SC_TST_SERVO_CHAN_READ     = (9), /* Print channel select info from servo */
+  e_SC_TST_FREQ_ZERO =	(10) /*Force the SC_FrequencyCorrection to always request 0 */
+} SC_t_dbgModeEnum;
+
+typedef enum
+{
+  e_SYNC_PAIR    = 0,  /* enum to describe a t1, t2 SYNC  PAIR */
+  e_DELAY_PAIR   = 1   /* enum to describe a t3, t4 DELAY PAIR */
+} t_pairDirectionEnum;
+
+
+/* Structures */
+
+typedef struct
+{
+  SC_t_dbgModeEnum b_dbgMode;   /* Test modes (default = e_SC_TST_NORMAL */
+  UINT32           l_debugMask; /* bitmapped debug message mask          */
+  INT32            l_debugTsLimit; /* Set threshold for check timestamp mismatch  */
+} t_logConfigType;
+
+typedef struct
+{
+  t_fllStateEnum e_fllState;           /* FLL state enumeration              */
+  UINT32         dw_fllStateDur;       /* FLL status duration (seconds)      */
+  FLOAT32        f_fwdWeight;          /* forward flow weight                */
+  UINT32         dw_fwdTransFree900;   /* forward flow transient-free out of */
+                                       /* 900 s */
+  UINT32         dw_fwdTransFree3600;  /* forward flow transient-free out of */
+                                       /* 3600 s */
+  FLOAT32        f_fwdPct;             /* forward flow transactions used (%) */
+  FLOAT32        f_fwdMinTdev;         /* forward flow operational min TDEV  */
+                                       /* (ns) */
+  FLOAT32        f_fwdMafie;           /* forward Mafie */
+  FLOAT32        f_fwdMinClstrWidth;   /* forward flow min cluster width (ns)*/
+  FLOAT32        f_fwdModeWidth;       /* forward flow mode width (ns)       */
+  FLOAT32        f_revWeight;          /* reverse flow weight                */
+  INT32          dw_revTransFree900;   /* reverse flow transient-free out of */
+                                       /* 900 s */
+  UINT32         dw_revTransFree3600;  /* reverse flow transient-free out of */
+                                       /* 3600 s */
+  FLOAT32        f_revPct;             /* reverse flow transactions used (%) */
+  FLOAT32        f_revMinTdev;         /* reverse flow operational min TDEV  */
+                                       /* (ns) */
+  FLOAT32        f_revMafie;           /* reverse Mafie */
+  FLOAT32        f_revMinClstrWidth;   /* reverse flow min cluster width (ns)*/
+  FLOAT32        f_revModeWidth;       /* reverse flow mode width (ns)       */
+  FLOAT32        f_freqCorrection;     /* frequency correction (ppb)         */
+  FLOAT32        f_phaseCorrection;    /* phase correction (ns)             */
+  FLOAT32        f_tdevEstimate;       /* output TDEV estimate (ns)          */
+  FLOAT32        f_mdevEstimate;       /* output MDEV estimate  (ppb)        */
+  FLOAT32        f_residualPhaseErr;   /* residual phase error (ns)          */
+  FLOAT32        f_minRoundTripDly;    /* minimal round trip delay, RTD (ns) */
+  UINT16         w_fwdPktRate;         /* sync packet rate (pkts/s)          */
+  UINT16         w_revPktRate;         /* delay packet rate (pkts/s)         */
+  FLOAT32        f_ipdvFwdPct;         /* forward IPDV % below threshold     */
+  FLOAT32        f_ipdvFwdMax;         /* forward maximum IPDV (usec)        */
+  FLOAT32        f_ipdvFwdJitter;      /* forward interpacket jitter (usec)  */
+  FLOAT32        f_ipdvRevPct;         /* reverse IPDV % below threshold     */
+  FLOAT32        f_ipdvRevMax;         /* reverse maximum IPDV (usec)        */
+  FLOAT32        f_ipdvRevJitter;      /* reverse interpacket jitter (usec)  */
+} t_ptpPerformanceStatusType;
+
+typedef struct
+{
+  FLOAT32        f_ipdvFwdPct;         /* forward IPDV % below threshold     */
+  FLOAT32        f_ipdvFwdMax;         /* forward maximum IPDV (usec)        */
+  FLOAT32        f_ipdvFwdJitter;      /* forward interpacket jitter (usec)  */
+  FLOAT32        f_ipdvRevPct;         /* reverse IPDV % below threshold     */
+  FLOAT32        f_ipdvRevMax;         /* reverse maximum IPDV (usec)        */
+  FLOAT32        f_ipdvRevJitter;      /* reverse interpacket jitter (usec)  */
+} t_ptpIpdvType;
+
+typedef struct
+{
+  UINT16         w_ipdvObservIntv;   /* IPDV observation interval */
+  INT32          l_ipdvThres;        /* IPDV threshold (nsec) */
+  UINT16         w_pacingFactor;     /* IPDV pacing factor */
+} t_ptpIpdvConfigType;
+
+typedef struct
+{
+  t_fllStateEnum e_fllState;         /* FLL state enumeration */
+  UINT32         dw_fllStateDur;     /* FLL status duration (seconds)*/
+} t_ptpServoStatusType;
+
+typedef struct
+{
+  UINT64 u48_sec; /* PTP seconds field (48bits) */
+  UINT32 dw_nsec; /* PTP nanoseconds field      */
+} t_ptpTimeStampType;
+
+/************************************************************************/
+/** t_TmIntv
+                 This struct defines a time interval in scaled Nanoseconds.
+                 The Nanoseconds are multiplied by 2 to the power of 16. 
+                 For example: 2.5 ns = 0x28000.
+**/
+typedef struct
+{
+  INT64 ll_scld_nsec;
+} t_TmIntv;
+
+typedef struct
+{
+  t_loTypeEnum             e_loType;             /* local oscillator type                   */
+  UINT8                    b_loQl;        /* local oscillator quality level          */
+  t_ptpAccessTransportEnum e_ptpTransport;       /* PTP transport modes (see enum)          */
+  UINT32                   dw_ptpPhaseMode;      /* Bit Mapped Phase mode of servo loop     */
+  FLOAT32                  f_freqCorr;        /* OCXO frequency offset sampled hourly    */
+  t_ptpTimeStampType       s_freqCorrTime;    /* timestamp for hourly frequency offset   */
+  FLOAT32                  f_freqCalFactory;     /* OCXO frequency offset at factory        */
+  t_ptpTimeStampType       s_freqCalFactoryTime; /* timestamp for factory frequency offset  */
+  UINT32                   dw_bridgeTime;        /* Bridge time in nanoseconds              */
+} t_servoConfigType;
+
+
+
+
+/************************************************************************/
+/** t_timestampPairType
+                 This struct defines timestamp pairs.
+**/
+typedef struct
+{
+    t_ptpTimeStampType  s_masterTS;      /* timestamp from master (t1 or t4) */
+    t_ptpTimeStampType  s_slaveTS;       /* timestamp from slave  (t2 or t3) */
+    UINT16              w_seqNum;        /* packet sequence number           */
+    UINT16              w_channel;       /* channel number                   */
+	 t_pairDirectionEnum e_pairDir;        /* either forward (SYNC) or reverse (DELAY) */
+} t_timestampPairType;
+
+
+/*****************************************************************************/
+/*                       ***Public Data Section***                           */
+/*  Global variables, if used, should be defined in a ".c" source file.      */
+/*  The scope of a global may be extended to other modules by declaring it as*/
+/*  as an extern here. 			                                     */
+/*****************************************************************************/
+
+/*****************************************************************************/
+/*                       ***Function Prototype Section***                    */
+/*  This section to be used to prototype public functions.                   */
+/*                                                                           */
+/*  Descriptions of parameters and return code should be given for each      */
+/*  function.                                                                */
+/*****************************************************************************/
+
+/*
+----------------------------------------------------------------------------
+                                SC_VerInfo()
+
+Description:
+This function requests the current version information.  The version
+information is copied to the input data buffer as a string.  The string
+contains name value pairs separated by commas.  White space should be
+ignored.  If the buffer is not large enough to contain the entire revision
+string, the output will be truncated to fit the available space.  Output
+will be NULL terminated.  e.g. softclient=1.0a,servo=1.0a,phys=1.2
+
+
+Parameters:
+
+Inputs
+        UINT16 w_lenBuffer
+        This parameter passes the buffer length to the function.
+
+Outputs:
+        INT8 *c_revBuffer,
+        The function will copy the revision string into this pointer location.
+
+Return value:
+        None
+
+-----------------------------------------------------------------------------
+*/
+extern void SC_VerInfo(
+	INT8 *c_revBuffer,
+	UINT16 w_lenBuffer
+);
+
+/*
+----------------------------------------------------------------------------
+                                SC_GetServoConfig()
+
+Description:
+This function get clock servo configuration parameters.
+
+Parameters:
+
+Inputs
+        None
+
+Outputs:
+        ps_servoCfg
+        Pointer to clock configuration data structure
+
+Return value:
+         0: function succeeded
+        -1: function failed
+
+-----------------------------------------------------------------------------
+*/
+extern int SC_GetServoConfig(
+	t_servoConfigType* ps_servoCfg);
+
+/*
+----------------------------------------------------------------------------
+                                SC_newGrandmaster()
+
+Description:
+This function informs the PTP servo that a new grandmaster is supplying the
+timestamps.
+
+Parameters:
+
+Inputs
+	None
+
+Outputs:
+	None
+
+Return value:
+   None
+-----------------------------------------------------------------------------
+*/
+extern void SC_NewGrandmaster(void);
+
+
+/*
+----------------------------------------------------------------------------
+                                SC_ClkIpdvConfig()
+
+Description:
+This function gets or sets the current IPDV performance parameters.   On a get, 
+the current parameters are copied into the supplied structure.  On a set, 
+the current parameters are set from the supplied structure.  Note that all 
+parameters are valid during set operations.  Modifications to parameters 
+should be done using a read-modify-write cycle.
+
+Parameters:
+
+Inputs
+	t_ptpIpdvConfigType *ps_ptpIpdvConfig 
+	On a set, this pointer defines the IPDV performance configuration.
+	
+	t_paramOperEnum b_operation  
+	This enumeration defines the operation of the function to either
+	set or get.
+		e_PARAM_GET - Get parameters
+		e_PARAM_SET - Set parameters
+Outputs:
+	t_ptpIpdvConfigType *ps_ptpIpdvConfig 
+	On a get, the current IPDV performance configuration is written
+	to this pointer location.
+
+Return value:
+	 0: function succeeded
+	-1: function failed
+
+-----------------------------------------------------------------------------
+*/
+extern int SC_ClkIpdvConfig(
+	t_ptpIpdvConfigType *ps_ptpIpdvConfig,
+	t_paramOperEnum      b_operation
+);
+
+/*
+----------------------------------------------------------------------------
+                                SC_ClkIpdvGet()
+
+Description:
+This function gets the current IPDV performance parameters.   On the get, 
+the current parameters are copied into the supplied structure.  
+
+Parameters:
+
+Inputs
+	None
+
+Outputs:
+	t_ptpIpdvType *ps_ptpIpdvConfig 
+	On a get, the current IPDV performance status is written
+	to this pointer location.
+
+Return value:
+	 0: function succeeded
+	-1: function failed
+
+-----------------------------------------------------------------------------
+*/
+extern int SC_ClkIpdvGet(
+	t_ptpIpdvType *ps_ptpIpdv
+);
+
+/*
+----------------------------------------------------------------------------
+                                SC_GetPtpPerformance()
+
+Description:
+This function requests the current PTP performance data.  
+
+Parameters:
+
+Inputs
+	None
+
+Outputs:
+	t_ptpPerformanceStatusType *ps_ptpPerformanceConfig 
+	The current PTP performance data is written to this pointer location.
+
+Return value:
+	 0: function succeeded
+	-1: function failed
+
+-----------------------------------------------------------------------------
+*/
+extern int SC_GetPtpPerformance(
+	t_ptpPerformanceStatusType *ps_ptpPerformanceConfig
+);
+
+/*
+----------------------------------------------------------------------------
+                                SC_ClkIpdvClrCtrs()
+
+Description:
+This function clears the current PTP performance counters. 
+
+Parameters:
+
+Inputs
+	None
+
+Outputs:
+	None
+
+
+Return value:
+	 0: function succeeded
+	-1: function failed
+
+-----------------------------------------------------------------------------
+*/
+extern int SC_ClkIpdvClrCtrs( void );
+
+/*
+----------------------------------------------------------------------------
+                                SC_GetServoStatus()
+
+Description:
+This function reads the current PTP servo status. 
+Parameters:
+
+Inputs
+	None
+
+Outputs:
+	t_ptpServoStatusType *ps_ptpServoStatus
+	The current PTP performance status is written to this pointer location.
+
+Return value:
+	 0: function succeeded
+	-1: function failed
+
+-----------------------------------------------------------------------------
+*/
+extern int SC_GetServoStatus(
+	t_ptpServoStatusType *ps_ptpServoStatus
+);
+
+/*
+----------------------------------------------------------------------------
+                                SC_FrequencyCorrection()
+
+Description:
+This function is called by the SoftClient code.  This function gets or sets
+the current fractional frequency error.  The signed error is in ppb.  A 
+positive value indicates a greater frequency.  This function is called 
+with a write operation at roughly 1 Hz after softClient has reached the XXXX 
+state.
+
+Parameters:
+
+Inputs
+	FLOAT64 *pff_freqCorr
+	On a set, this pointer defines the the current frequency correction to 
+	be applied to the local clock.  The value is in units of ppb.
+
+	t_paramOperEnum b_operation  
+	This enumeration defines the operation of the function to either set or 
+	get.
+		e_PARAM_GET - Get fractional frequency offset
+		e_PARAM_SET - Set fractional frequency offset
+Outputs:
+	FLOAT64 *pff_freqCorr
+	On a get, the current frequency correction is written to this pointer 
+	location.
+
+Return value:
+	 0: function succeeded
+	-1: function failed
+
+-----------------------------------------------------------------------------
+*/
+extern int SC_FrequencyCorrection(
+	FLOAT64         *pff_freqCorr,
+	t_paramOperEnum b_operation
+);
+
+/*
+----------------------------------------------------------------------------
+                                SC_SystemTime()
+
+Description:
+This function is called by the SoftClient code.  This function either sets
+or gets the system clock time.  The time is in seconds and nanoseconds.  
+
+Parameters:
+
+Inputs
+        t_ptpTimeStampType *ps_sysTime
+        On a set, this pointer defines the the current system time.
+
+        INT16 *pi_utcOffset
+        On a set, this pointer defines the the current UTC offset.
+
+        t_paramOperEnum b_operation  
+        This enumeration defines the operation of the function to either
+        set or get.
+                e_PARAM_GET - Get current system time
+                e_PARAM_SET - Set system time
+
+Outputs:
+        t_ptpTimeStampType *ps_sysTime
+        On a get, the current system time is written to this pointer location.
+
+        INT16 *pi_utcOffset
+        On a get, the current UTC offset is written to this pointer location.
+
+Return value:
+         0: function succeeded
+        -1: function failed
+
+-----------------------------------------------------------------------------
+*/
+extern int SC_SystemTime(
+        t_ptpTimeStampType  *ps_sysTime,
+        INT16               *pi_utcOffset,
+        t_paramOperEnum     b_operation
+);
+
+/*
+----------------------------------------------------------------------------
+                                SC_PhaseOffset()
+
+Description:
+This function is called by the SoftClient code.  This function sets or gets
+the phase correction  value.  The signed offset is in nanoseconds.  The 
+offset should be added to the current clock value.  This function is called 
+with a write operation at roughly 1 Hz after softClient has reached the XXXX 
+state.
+
+Parameters:
+
+Inputs
+	INT64 *pll_ phaseCorrection
+	On a set, this pointer defines the the current phase correction to
+	be applied to the local clock.  The value is in units of nanoseconds.
+
+	t_paramOperEnum b_operation  
+	This enumeration defines the operation of the function to either
+	set or get.
+		e_PARAM_GET - Get current phase correction
+		e_PARAM_SET - Set phase correction
+
+Outputs:
+	INT64 *pll_ phaseCorrection
+	On a get, the current phase correction is written to this pointer
+	location.
+
+Return value:
+	 0: function succeeded
+	-1: function failed
+
+-----------------------------------------------------------------------------
+*/
+extern int SC_PhaseOffset(
+	INT64           *pll_phaseOffset,
+        t_paramOperEnum b_operation
+);
+
+/*
+----------------------------------------------------------------------------
+                                SC_Event()
+
+Description:
+Called by SoftClient, this function was formerly named SC_EventLog(). The name has been
+changed to remove the implication that the sole purpose of the function is for logging of events.
+On the SCRDB, the user-code handling of this function writes the events to syslog, but there
+could be other actions taken, such as control of LEDs in a target implementation.
+Parameters:
+
+Inputs
+	UINT16 w_eventId
+	Event Id
+
+	t_eventSevEnum e_sev
+	Event severity
+
+	t_eventStateEnum e_state
+	Indicate if event is set or clear
+
+	const char* fmt_ptr
+	Pointer to printf format string of event message
+
+	INT32 aux_info
+	additional context-specific information associated with the specific event.
+	If there is no context-specific usage for the event -d, -1 will be assigned.
+
+Outputs:
+	None
+
+Return value:
+	 0: function succeeded
+	-1: function failed
+
+-----------------------------------------------------------------------------
+*/
+extern int SC_Event(
+	UINT16           w_eventId,
+	t_eventSevEnum   e_sev,
+	t_eventStateEnum e_state,
+	const char       *fmt_ptr,
+	INT32            aux_info
+);
+
+/*
+----------------------------------------------------------------------------
+                                SC_GetEventMap()
+
+Description:
+Called by user, this function was return the current state of all the events in
+the form of a bit map.
+
+
+Parameters:
+
+Inputs
+	UINT32 *pdw_eventMap
+	Address of UINT32 memory location where the results will be stored.
+
+Outputs:
+	UINT32 *pdw_eventMap
+	The bit mapped events.  The position of the event is based on the event's
+	ID number.  For example, if there is a '1' in the bit 0 position, then the
+	SoftClock is currently in Holdover mode (see sc_api.h for event ID numbers.)
+
+
+Return value:
+	 0: function succeeded
+	-1: function failed
+
+-----------------------------------------------------------------------------
+*/
+extern int SC_GetEventMap(UINT32 *pdw_eventMap);
+
+/*
+----------------------------------------------------------------------------
+                                SC_DbgLog()
+
+Description:
+This function sends debug log message to logging system.
+
+Parameters:
+
+Inputs
+        const char* fmt_ptr
+        Pointer to printf format string
+
+Outputs:
+        None
+
+Return value:
+         0: function succeeded
+        -1: function failed
+
+-----------------------------------------------------------------------------
+*/
+extern int SC_DbgLog(
+	const char *msg
+);
+
+/*
+----------------------------------------------------------------------------
+                                SC_DbgConfig()
+
+Description:
+This function gets or sets the current long configuration parameters.   
+On a get, the current parameters are copied into the supplied structure.  
+On a set, the current parameters are set from the supplied structure.  
+ 
+
+Parameters:
+
+Inputs
+	t_logConfigType *ps_logConfig 
+	On a set, this pointer defines the current log configuration .
+
+	t_paramOperEnum b_operation  
+	This enumeration defines the operation of the function to either 
+	set or get.
+		e_PARAM_GET - Get the current log configuration
+		e_PARAM_SET - Set the current log configuration
+
+Outputs
+	t_logConfigType *s_logConfig 
+	On a get, the current log configuration is written to this
+	pointer location.
+
+Return value:
+	 0: function succeeded
+	-1: function failed
+
+-----------------------------------------------------------------------------
+*/
+extern int SC_DbgConfig(
+	t_logConfigType *ps_logConfig,
+	t_paramOperEnum b_operation 
+);
+
+/*
+----------------------------------------------------------------------------
+                                SC_StoreFreqCorr()
+
+Description:
+This function store the frequency correction data into non-volatile
+memory.   It is timestamped with the current TAI time.
+
+Inputs
+	None
+
+Outputs:
+	FLOAT32  f_freqCorr
+	The current frequency correction in ppb.
+
+	t_ptpTimeStampType s_freqCorrTime
+	The timestamp for hourly frequency offset
+
+Return value:
+	 0: function succeeded
+	-1: function failed
+
+-----------------------------------------------------------------------------
+*/
+extern int SC_StoreFreqCorr(
+   FLOAT32             f_freqCorr,
+   t_ptpTimeStampType  s_freqCorrTime
+);
+
+/*
+----------------------------------------------------------------------------
+                                SC_RestartServo()
+
+Description:
+This function a place holder and is not currently supported.
+
+Inputs
+	None
+
+Outputs:
+	None
+
+Return value:
+	None
+
+-----------------------------------------------------------------------------
+*/
+extern int SC_RestartServo(void);
+
+/*
+----------------------------------------------------------------------------
+                                SC_RunOneSecTask()
+
+Description:
+This function must be called every second.
+
+Inputs
+	None
+
+Outputs:
+	None
+
+Return value:
+    0 - success
+   -1 - failure
+   -2 - SC_InitChanConfig() has not been run yet
+
+-----------------------------------------------------------------------------
+*/
+extern int SC_RunOneSecTask(void);
+
+/*
+----------------------------------------------------------------------------
+                                SC_RunAnalysisTask()
+
+Description:
+This function should be called every 8 seconds. The thread calling this
+function should have lower priority since the function may need a few
+seconds to complete.
+
+Inputs
+	None
+
+Outputs:
+	None
+
+Return value:
+    0 - success
+   -1 - failure
+   -2 - SC_InitChanConfig() has not been run yet
+
+-----------------------------------------------------------------------------
+*/
+extern int SC_RunAnalysisTask(void);
+
+/*
+----------------------------------------------------------------------------
+                                SC_TimestampPairToServo()
+
+Description:
+This function will transfer either a t1, t2 or t3, t4 timestamp pair to 
+the PTP servo Task.  This function should be called every time a new
+pair is available for the PTP servo.
+
+Parameters:
+
+Inputs
+	ps_timestampPair
+	Pointer to timestamp pair (either t1, t2 or t3, t4 pair)
+
+  UINT8 b_ChanIndex
+  Channel index for PTP measurement
+
+Outputs:
+	None
+
+Return value:
+	 0: function succeeded
+	-1: function failed (buffer full)
+
+-----------------------------------------------------------------------------
+*/
+extern int SC_TimestampPairToServo(
+  UINT8 b_ChanIndex,
+	t_timestampPairType* ps_timestampPair
+);
+
+
+/*
+----------------------------------------------------------------------------
+                                SC_TimeMeasToServo()
+
+Description:
+This function will transfer either a phasor measurement to the servo input 
+queue.
+
+Parameters:
+
+Inputs
+	b_ChanIndex
+	Channel index assigned during configuration
+	
+	l_timeMeasNs
+	Measurement in nanoseconds
+
+   t_ptpTimeStampType s_currentTime
+   This is the time reported from the phasor source when the phasor 
+   measurement was made.  Time is in TAI time. Current implementation
+   does not use the nanoseconds field.  If pointer is null, then no
+   time is available.
+   
+Outputs:
+	None
+
+Return value:
+	 0: function succeeded
+	-1: function failed (buffer full)
+
+-----------------------------------------------------------------------------
+*/
+
+extern int SC_TimeMeasToServo(
+   UINT8 b_ChanIndex, 
+   INT32 l_timeMeasNs,
+   t_ptpTimeStampType *s_currentTime
+);
+
+/*
+----------------------------------------------------------------------------
+                                SC_SyncPhaseThreshold()
+
+Description: This function is called by the user to set or get the threshold
+at which the phase will automatically jam to the current reference.
+
+
+Parameters:
+
+Inputs
+	b_operation
+	This enumeration defines the operation of the function to either
+	set or get.
+		e_PARAM_GET - Get the sync threshold
+		e_PARAM_SET - Set the sync threshold
+
+	UINT32 *pdw_syncThresholdNs
+		Address to set or get sync threshold in nanoseconds
+
+Outputs:
+	UINT32 *pdw_syncThresholdNs
+		sync threshold in nanoseconds from 1000 to 1000000000.  If the value is set to 
+      1000000000, then there will be no automatic syncs.
+
+
+Return value:
+    0 - successful
+   -1 - function failed
+
+-----------------------------------------------------------------------------
+*/
+extern int SC_SyncPhaseThreshold(
+  t_paramOperEnum b_operation,
+  UINT32 *pdw_syncThresholdNs
+);
+
+/*
+----------------------------------------------------------------------------
+                                SC_SyncPhaseNow()
+
+
+Description: This function is called by the user to immediately jam (sync) to 
+the currently selected timing reference phase.
+
+
+Parameters:
+
+Inputs
+	None
+
+Outputs:
+	None
+
+
+Return value:
+    0 - successful
+   -1 - function failed
+   -2 - function failed (no time reference)
+   -3 - function failed (no jam necessary)
+
+-----------------------------------------------------------------------------
+*/
+extern int SC_SyncPhaseNow(void);
+
+#ifdef SERVO_ONLY
+/*
+----------------------------------------------------------------------------
+                               SC_ServoConfig()
+
+Description:
+This function sets or gets the servo parameters.
+
+Parameters:
+
+Inputs
+        t_servoConfigType *ps_servoConfig
+        On a set, this pointer defines the clock configuration.
+
+        t_paramOperEnum   b_operation
+        Indicates a set or get operation.
+
+Outputs:
+        t_servoConfigType *ps_servoConfig
+        On a get, the current clock configuration is written to this
+        pointer location.
+
+Return value:
+         0: function succeeded
+        -1: function failed
+        -3: invalid value in ps_servoCfg
+
+-----------------------------------------------------------------------------
+*/
+extern int SC_ServoConfig(t_servoConfigType *ps_servoConfig,
+                          t_paramOperEnum   b_operation);
+
+#define SC_InitServoConfig(x)   SC_ServoConfig((x), e_PARAM_SET)
+
+#endif // SERVO_ONLY
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /*  H_SC_SERVO_API_h */
+
